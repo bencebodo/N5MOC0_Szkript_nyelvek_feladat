@@ -23,25 +23,29 @@ GUIDE_STEPS = (
     "2. Keress rá a könyvre.",
     "3. Nyisd meg a könyv oldalát, és másold ki az URL-t a címsorból. "
     "Tartalmaznia kell egy bibFSZ azonosítót, például:\n" + EXAMPLE_URL,
-    "4. Illeszd be az URL-t a fenti mezőbe, és kattints az „Add Book” gombra.",
-    "5. Válassz ki egy könyvet, és kattints a „Check Selected” vagy a „Check All” "
-    "gombra. A könyvtáranként elérhető példányok a kimeneti táblázatban jelennek meg.",
+    "4. Illeszd be az URL-t a fenti mezőbe, és kattints a „Könyv hozzáadása” gombra.",
+    "5. Válassz ki egy könyvet, és kattints a „Kijelölt ellenőrzése” vagy az "
+    "„Összes ellenőrzése” gombra. A könyvtáranként elérhető példányok az "
+    "elérhetőség táblázatban jelennek meg.",
     "6. A „Közvetlen link” oszlopban a linkre kattintva megnyílik a könyv oldala.",
 )
-NO_COPIES_TEXT = "No available copies found"
-NETWORK_ERROR_TEXT = "Network error"
-PARSE_ERROR_TEXT = "Parse error"
+WARNING_TITLE = "Figyelmeztetés"
+INFO_TITLE = "Információ"
+READY_TEXT = "Kész"
+NO_COPIES_TEXT = "Nincs elérhető példány"
+NETWORK_ERROR_TEXT = "Hálózati hiba"
+PARSE_ERROR_TEXT = "Feldolgozási hiba"
 CHECK_DELAY_SECONDS = 0.5
 
 
 class LibraryApp_BB:
     def __init__(self, master):
         self.master = master
-        self.master.title("FSZEK Library Tracker")
+        self.master.title("FSZEK Könyvtárkövető")
         self.master.protocol("WM_DELETE_WINDOW", self.on_close)
         self.database = LibraryDatabase_BB(DB_FILE)
         self.bib_var = tk.StringVar()
-        self.status_var = tk.StringVar(value="Ready")
+        self.status_var = tk.StringVar(value=READY_TEXT)
         self.action_buttons = []
         self.results = {}
         self.create_widgets()
@@ -57,7 +61,7 @@ class LibraryApp_BB:
         ttk.Entry(input_frame, textvariable=self.bib_var, width=50).grid(
             row=0, column=1, padx=5, pady=2
         )
-        add_button = ttk.Button(input_frame, text="Add Book", command=self.add_book)
+        add_button = ttk.Button(input_frame, text="Könyv hozzáadása", command=self.add_book)
         add_button.grid(row=0, column=2, padx=5)
 
         table_frame = ttk.Frame(container, padding=(10, 0))
@@ -87,13 +91,13 @@ class LibraryApp_BB:
         button_frame = ttk.Frame(container, padding=10)
         button_frame.pack(fill="x")
         check_selected_button = ttk.Button(
-            button_frame, text="Check Selected", command=self.check_selected
+            button_frame, text="Kijelölt ellenőrzése", command=self.check_selected
         )
         check_all_button = ttk.Button(
-            button_frame, text="Check All", command=self.check_all
+            button_frame, text="Összes ellenőrzése", command=self.check_all
         )
         delete_button = ttk.Button(
-            button_frame, text="Delete Selected", command=self.delete_selected
+            button_frame, text="Kijelölt törlése", command=self.delete_selected
         )
         for button in (check_selected_button, check_all_button, delete_button):
             button.pack(side="left", padx=5)
@@ -146,20 +150,20 @@ class LibraryApp_BB:
     def add_book(self):
         raw_id = self.bib_var.get().strip()
         if not raw_id:
-            messagebox.showwarning("Warning", "Paste the book URL first.")
+            messagebox.showwarning(WARNING_TITLE, "Először illeszd be a könyv URL-jét.")
             return
         bib_id = extract_bib_id_BB(raw_id)
         if bib_id is None:
             messagebox.showwarning(
-                "Warning",
-                "The URL must contain a bibFSZ id, for example:\n" + EXAMPLE_URL,
+                WARNING_TITLE,
+                "Az URL-nek tartalmaznia kell egy bibFSZ azonosítót, például:\n" + EXAMPLE_URL,
             )
             return
         if self.database.book_exists_BB(bib_id):
-            messagebox.showwarning("Warning", "This book is already listed.")
+            messagebox.showwarning(WARNING_TITLE, "Ez a könyv már szerepel a listában.")
             return
         self.set_buttons_state("disabled")
-        self.set_status("Loading record...")
+        self.set_status("Rekord betöltése...")
         worker = threading.Thread(target=self.load_record, args=(bib_id,), daemon=True)
         worker.start()
 
@@ -175,16 +179,16 @@ class LibraryApp_BB:
 
     def finish_add(self, bib_id, title, author, error):
         self.set_buttons_state("normal")
-        self.status_var.set("Done")
+        self.status_var.set(READY_TEXT)
         if not title:
-            reason = error or "No title in the response"
+            reason = error or "A válasz nem tartalmaz címet."
             messagebox.showwarning(
-                "Warning",
-                "Could not load the book title.\n\n" + reason,
+                WARNING_TITLE,
+                "A könyv címét nem sikerült betölteni.\n\n" + reason,
             )
             return
         if not self.database.add_book_BB(title, bib_id, author):
-            messagebox.showwarning("Warning", "This book is already listed.")
+            messagebox.showwarning(WARNING_TITLE, "Ez a könyv már szerepel a listában.")
             return
         self.bib_var.set("")
         self.refresh_list()
@@ -203,7 +207,7 @@ class LibraryApp_BB:
     def get_selected_item(self):
         selection = self.tree.selection()
         if not selection:
-            messagebox.showwarning("Warning", "Select a book first.")
+            messagebox.showwarning(WARNING_TITLE, "Előbb válassz ki egy könyvet.")
             return None
         return selection[0]
 
@@ -219,7 +223,7 @@ class LibraryApp_BB:
             for item_id in self.tree.get_children()
         ]
         if not items:
-            messagebox.showinfo("Info", "The list is empty.")
+            messagebox.showinfo(INFO_TITLE, "A lista üres.")
             return
         self.start_checks(items)
 
@@ -231,7 +235,7 @@ class LibraryApp_BB:
     def run_checks(self, items):
         total = len(items)
         for index, (item_id, bib_id) in enumerate(items, start=1):
-            self.master.after(0, self.set_status, f"Checking {index}/{total}...")
+            self.master.after(0, self.set_status, f"Ellenőrzés {index}/{total}...")
             counts, error = self.check_book_availability(bib_id)
             self.master.after(0, self.set_row_result, item_id, counts, error)
             time.sleep(CHECK_DELAY_SECONDS)
@@ -260,7 +264,7 @@ class LibraryApp_BB:
 
     def finish_checks(self):
         self.set_buttons_state("normal")
-        self.status_var.set("Done")
+        self.status_var.set(READY_TEXT)
 
     def set_buttons_state(self, state):
         for button in self.action_buttons:
