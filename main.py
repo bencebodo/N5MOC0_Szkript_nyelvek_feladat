@@ -15,6 +15,7 @@ from LibraryTracker_BB import (
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.db")
 NO_COPIES_TEXT = "No available copies found / nincs elérhető példány"
 NETWORK_ERROR_TEXT = "Network error / hálózati hiba"
+PARSE_ERROR_TEXT = "Parse error / feldolgozási hiba"
 CHECK_DELAY_SECONDS = 0.5
 
 
@@ -163,6 +164,8 @@ class LibraryApp_BB:
             branches = fetch_availability_BB(bib_id)
         except requests.exceptions.RequestException:
             return NETWORK_ERROR_TEXT
+        except ValueError:
+            return PARSE_ERROR_TEXT
         if not branches:
             return NO_COPIES_TEXT
         return ", ".join(branches)
