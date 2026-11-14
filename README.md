@@ -31,7 +31,7 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
   - `get_books_BB()`: visszaadja az összes könyvet `(id, title, bibId, author)` rekordokként
   - `delete_book_BB(book_id)`: törli a megadott könyvet
   - `close_BB()`: lezárja az adatbázis-kapcsolatot
-- `LibraryApp_BB`: felépíti a grafikus felületet és kezeli az eseményeket (gombok, kijelölés, dupla kattintás, ablak bezárása)
+- `LibraryApp_BB`: felépíti a grafikus felületet és kezeli az eseményeket (gombok, kijelölés, a közvetlen link kattintása, ablak bezárása)
 
 ### Saját függvények
 

@@ -66,7 +66,8 @@ class LibraryApp_BB:
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        self.tree.bind("<Double-1>", self.open_link)
+        self.tree.bind("<Button-1>", self.on_tree_click)
+        self.tree.bind("<Motion>", self.on_tree_motion)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
 
         button_frame = ttk.Frame(self.master, padding=10)
@@ -262,11 +263,22 @@ class LibraryApp_BB:
         for location, count in counts:
             self.output_tree.insert("", "end", values=(location, count))
 
-    def open_link(self, event):
-        item_id = self.tree.identify_row(event.y)
-        if not item_id:
-            return
-        webbrowser.open(self.tree.set(item_id, "link"))
+    def link_row_at(self, event):
+        if self.tree.identify_region(event.x, event.y) != "cell":
+            return ""
+        column_index = int(self.tree.identify_column(event.x)[1:]) - 1
+        if self.tree["columns"][column_index] != "link":
+            return ""
+        return self.tree.identify_row(event.y)
+
+    def on_tree_motion(self, event):
+        cursor = "hand2" if self.link_row_at(event) else ""
+        self.tree.configure(cursor=cursor)
+
+    def on_tree_click(self, event):
+        item_id = self.link_row_at(event)
+        if item_id:
+            webbrowser.open(self.tree.set(item_id, "link"))
 
     def delete_selected(self):
         item_id = self.get_selected_item()
