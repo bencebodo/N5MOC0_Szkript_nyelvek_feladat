@@ -4,7 +4,7 @@
 
 ## A feladat rövid leírása
 
-Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kiválasztott könyvek elérhetőségét lehet nyomon követni. A felhasználó megadja a könyv címét és a katalógusazonosítót (bibId) vagy a katalógus teljes URL-jét, a program ezeket SQLite adatbázisban tárolja. Az elérhetőség ellenőrzése a FSZEK online katalógusának lekérdezésével történik, az eredmény könyvtáranként megmutatja, hány példány elérhető. A lekérdezés háttérszálon fut, így a felület nem fagy le.
+Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kiválasztott könyvek elérhetőségét lehet nyomon követni. A felhasználó beilleszti a könyv katalógusbeli URL-jét (benne a `bibFSZ…` azonosítóval), a program pedig a címet és a szerzőt lekéri, majd a könyvet SQLite adatbázisban tárolja. Az elérhetőség ellenőrzése a FSZEK online katalógusának lekérdezésével történik, az eredmény könyvtáranként megmutatja, hány példány elérhető. A lekérdezés háttérszálon fut, így a felület nem fagy le.
 
 ## Modulok
 
@@ -42,6 +42,35 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
 - `fetch_availability_BB(bib_id)`: a FSZEK katalógusától lekéri az elérhetőséget, a címet és a szerzőt (három kérésben)
 - `count_available_BB(items)`: az elérhető példányokat könyvtáranként összesíti
 - `add_session_cookies_BB(session)`: a katalógus által elvárt munkamenet-sütiket állítja be
+
+### A tanult modulok függvényei
+
+- `tkinter`
+  - `tk.Tk()`: az alapablak (`root`) létrehozása
+  - `tk.StringVar()`: beviteli mezőhöz és állapotsorhoz kötött szöveg
+  - `ttk.Frame`, `ttk.LabelFrame`, `ttk.Label`, `ttk.Entry`, `ttk.Button`, `ttk.Scrollbar`: felületelemek
+  - `ttk.Treeview` (`insert`, `delete`, `set`, `selection`, `identify_row`, `identify_column`, `identify_region`, `bind`): táblázatok és eseménykezelés
+  - `tkinter.font.Font(...)`: aláhúzott link betűtípusa
+  - `messagebox.showwarning(...)`, `messagebox.showinfo(...)`: párbeszédablakok
+  - `root.after(...)`, `root.mainloop()`, `root.protocol(...)`, `root.destroy()`: ablak- és eseménykezelés
+- `sqlite3`
+  - `sqlite3.connect(...)`: kapcsolat megnyitása
+  - `connection.execute(...)`, `connection.commit()`, `connection.close()`: lekérdezések, mentés, lezárás
+  - `cursor.fetchone()`, `cursor.fetchall()`: eredmények olvasása
+- `re`
+  - `re.compile(...)`: reguláris kifejezések előfordítása
+  - `pattern.search(...)`: az azonosító és a példánylista keresése
+- `json`
+  - `json.loads(...)`: a példánylista beolvasása szövegből
+- `threading`
+  - `threading.Thread(...)`, `thread.start()`: háttérszál a hálózati kérésekhez
+- `time`
+  - `time.time()`: aktuális idő a munkamenet-sütikhez
+  - `time.sleep(...)`: várakozás a lekérdezések között
+- `os`
+  - `os.path.join(...)`, `os.path.dirname(...)`, `os.path.abspath(...)`: az adatbázisfájl útvonala
+- `webbrowser`
+  - `webbrowser.open(...)`: link megnyitása a böngészőben
 
 ### A requests függvényei
 
