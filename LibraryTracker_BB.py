@@ -34,15 +34,6 @@ SESSION_LIFETIME_MS = 1800000
 BIB_FSZ_PATTERN = re.compile(r"bibFSZ\d+")
 TRAILING_DIGITS_PATTERN = re.compile(r"(\d+)\s*/?\s*$")
 ITEMS_PATTERN = re.compile(r'circTable\.data\("itemsJson",\s*(\[.*?\])\);', re.DOTALL)
-LIBRARY_ORDER = (
-    "1117 Karinthy út 11.",
-    "KK",
-    "1093 Boráros tér 2.",
-    "1066 Teréz krt. 2-4.",
-    "1054 Vadász u. 42.",
-    "1221 Kossuth u. 30.",
-    "1126 Ugocsa u. 10.",
-)
 
 
 class LibraryDatabase_BB:
@@ -100,15 +91,6 @@ def extract_bib_id_BB(text):
     return match.group(1)
 
 
-def normalize_location_BB(location):
-    if re.match(r"KK\s", location):
-        return "KK"
-    for library in LIBRARY_ORDER:
-        if library != "KK" and library in location:
-            return library
-    return None
-
-
 def parse_items_BB(html):
     match = ITEMS_PATTERN.search(html)
     if match is None:
@@ -119,16 +101,16 @@ def parse_items_BB(html):
 def count_available_BB(items):
     counts = {}
     for item in items:
-        if item.get("available") is True:
-            library = normalize_location_BB(str(item.get("currentLocation", "")))
-            if library is not None:
-                counts[library] = counts.get(library, 0) + 1
+        location = str(item.get("currentLocation", "")).strip()
+        if not location:
+            continue
+        available = 1 if item.get("available") is True else 0
+        counts[location] = counts.get(location, 0) + available
     return counts
 
 
 def library_counts_BB(items):
-    counts = count_available_BB(items)
-    return [(library, counts[library]) for library in LIBRARY_ORDER if library in counts]
+    return list(count_available_BB(items).items())
 
 
 def parse_title_author_BB(items):

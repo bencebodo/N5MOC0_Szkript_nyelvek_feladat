@@ -222,9 +222,10 @@ class LibraryApp_BB:
             return NETWORK_ERROR_TEXT, []
         except ValueError:
             return PARSE_ERROR_TEXT, []
-        if not counts:
-            return NO_COPIES_TEXT, []
-        text = ", ".join(f"{location}: {count} db" for location, count in counts)
+        available_parts = [(location, count) for location, count in counts if count > 0]
+        if not available_parts:
+            return NO_COPIES_TEXT, counts
+        text = ", ".join(f"{location}: {count} db" for location, count in available_parts)
         return text, counts
 
     def set_status(self, text):

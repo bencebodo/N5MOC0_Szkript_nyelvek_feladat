@@ -39,7 +39,6 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
 - `parse_title_author_BB(items)`: a példányadatokból kiolvassa a címet és a szerzőt
 - `fetch_availability_BB(bib_id)`: a FSZEK katalógusától lekéri az elérhetőséget, a címet és a szerzőt (három kérésben)
 - `count_available_BB(items)`: az elérhető példányokat könyvtáranként összesíti
-- `normalize_location_BB(location)`: a példány helyét a listában szereplő könyvtár nevére alakítja
 - `add_session_cookies_BB(session)`: a katalógus által elvárt munkamenet-sütiket állítja be
 
 ### A requests függvényei
