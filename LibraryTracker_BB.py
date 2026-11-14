@@ -2,6 +2,7 @@ import json
 import re
 import sqlite3
 import time
+from html import unescape
 
 import requests
 
@@ -31,7 +32,15 @@ USER_AGENT = (
 )
 TIMEOUT_SECONDS = 15
 SESSION_LIFETIME_MS = 1800000
+BIB_FSZ_PATTERN = re.compile(r"bibFSZ\d+")
+TRAILING_DIGITS_PATTERN = re.compile(r"(\d+)\s*/?\s*$")
 ITEMS_PATTERN = re.compile(r'circTable\.data\("itemsJson",\s*(\[.*?\])\);', re.DOTALL)
+TITLE_META_PATTERN = re.compile(
+    r'<meta\s+name="citation_title"\s+content="([^"]*)"', re.IGNORECASE
+)
+AUTHOR_META_PATTERN = re.compile(
+    r'<meta\s+name="citation_author"\s+content="([^"]*)"', re.IGNORECASE
+)
 LIBRARY_ORDER = (
     "1117 Karinthy út 11.",
     "KK",
@@ -52,6 +61,9 @@ class LibraryDatabase_BB:
         self.connection.execute(
             "CREATE TABLE IF NOT EXISTS books (id INTEGER PRIMARY KEY, title TEXT, bibId TEXT)"
         )
+        columns = [row[1] for row in self.connection.execute("PRAGMA table_info(books)")]
+        if "author" not in columns:
+            self.connection.execute("ALTER TABLE books ADD COLUMN author TEXT")
         self.connection.commit()
 
     def book_exists_BB(self, bib_id):
@@ -60,18 +72,19 @@ class LibraryDatabase_BB:
         )
         return cursor.fetchone() is not None
 
-    def add_book_BB(self, title, bib_id):
+    def add_book_BB(self, title, bib_id, author=""):
         if self.book_exists_BB(bib_id):
             return False
         self.connection.execute(
-            "INSERT INTO books (title, bibId) VALUES (?, ?)", (title, bib_id)
+            "INSERT INTO books (title, bibId, author) VALUES (?, ?, ?)",
+            (title, bib_id, author),
         )
         self.connection.commit()
         return True
 
     def get_books_BB(self):
         cursor = self.connection.execute(
-            "SELECT id, title, bibId FROM books ORDER BY id"
+            "SELECT id, title, bibId, COALESCE(author, '') FROM books ORDER BY id"
         )
         return cursor.fetchall()
 
@@ -84,7 +97,11 @@ class LibraryDatabase_BB:
 
 
 def extract_bib_id_BB(text):
-    match = re.search(r"(\d+)\s*/?\s*$", text.strip())
+    stripped = text.strip()
+    match = BIB_FSZ_PATTERN.search(stripped)
+    if match is not None:
+        return match.group(0)
+    match = TRAILING_DIGITS_PATTERN.search(stripped)
     if match is None:
         return None
     return match.group(1)
@@ -120,6 +137,23 @@ def parse_branches_BB(html):
         for library in LIBRARY_ORDER
         if library in counts
     ]
+
+
+def parse_record_info_BB(html):
+    title_match = TITLE_META_PATTERN.search(html)
+    title = unescape(title_match.group(1)).strip() if title_match else ""
+    authors = [unescape(author).strip() for author in AUTHOR_META_PATTERN.findall(html)]
+    return title, ", ".join(author for author in authors if author)
+
+
+def fetch_record_info_BB(bib_id):
+    with requests.Session() as session:
+        session.headers.update({"User-Agent": USER_AGENT})
+        response = session.get(
+            MANIFESTATION_URL.format(bib_id=bib_id), timeout=TIMEOUT_SECONDS
+        )
+        response.raise_for_status()
+        return parse_record_info_BB(response.text)
 
 
 def add_session_cookies_BB(session):

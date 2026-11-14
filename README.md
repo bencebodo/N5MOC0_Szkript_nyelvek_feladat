@@ -25,15 +25,17 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
   - `__init__(path)`: megnyitja az adatbázist és létrehozza a táblát
   - `create_table_BB()`: létrehozza a `books` táblát, ha még nem létezik
   - `book_exists_BB(bib_id)`: ellenőrzi, hogy a katalógusazonosító már szerepel-e
-  - `add_book_BB(title, bib_id)`: új könyvet ment, duplikáció esetén `False`-t ad vissza
-  - `get_books_BB()`: visszaadja az összes könyvet `(id, title, bibId)` rekordokként
+  - `add_book_BB(title, bib_id, author)`: új könyvet ment, duplikáció esetén `False`-t ad vissza
+  - `get_books_BB()`: visszaadja az összes könyvet `(id, title, bibId, author)` rekordokként
   - `delete_book_BB(book_id)`: törli a megadott könyvet
   - `close_BB()`: lezárja az adatbázis-kapcsolatot
 - `LibraryApp_BB`: felépíti a grafikus felületet és kezeli az eseményeket (gombok, kijelölés, dupla kattintás, ablak bezárása)
 
 ### Saját függvények
 
-- `extract_bib_id_BB(text)`: a katalógusazonosítót vagy URL-t a végén található számjegyekre szűkíti
+- `extract_bib_id_BB(text)`: a `bibFSZ` azonosítót keresi, ennek hiányában a végén álló számjegyeket veszi ki
+- `fetch_record_info_BB(bib_id)`: lekéri a rekord címét és szerzőjét
+- `parse_record_info_BB(html)`: a rekord HTML-jéből kiolvassa a címet és a szerzőt
 - `fetch_availability_BB(bib_id)`: a FSZEK katalógusától lekéri az elérhetőséget (három kérésben)
 - `parse_branches_BB(html)`: a válaszban lévő példánylistából könyvtáranként megszámolja az elérhető példányokat
 - `count_available_BB(items)`: az elérhető példányokat könyvtáranként összesíti

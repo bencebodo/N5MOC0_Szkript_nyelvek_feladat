@@ -10,6 +10,7 @@ from LibraryTracker_BB import (
     LibraryDatabase_BB,
     extract_bib_id_BB,
     fetch_availability_BB,
+    fetch_record_info_BB,
 )
 
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.db")
@@ -35,7 +36,9 @@ class LibraryApp_BB:
     def create_widgets(self):
         input_frame = ttk.Frame(self.master, padding=10)
         input_frame.pack(fill="x")
-        ttk.Label(input_frame, text="Title / Cím:").grid(row=0, column=0, sticky="w")
+        ttk.Label(input_frame, text="Title (optional) / Cím (opcionális):").grid(
+            row=0, column=0, sticky="w"
+        )
         ttk.Entry(input_frame, textvariable=self.title_var, width=40).grid(
             row=0, column=1, padx=5, pady=2
         )
@@ -52,15 +55,17 @@ class LibraryApp_BB:
         table_frame.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(
             table_frame,
-            columns=("title", "bib_id", "available"),
+            columns=("title", "author", "bib_id", "available"),
             show="headings",
             height=12,
         )
         self.tree.heading("title", text="Title")
+        self.tree.heading("author", text="Author")
         self.tree.heading("bib_id", text="bibId")
         self.tree.heading("available", text="Available at")
         self.tree.column("title", width=250)
-        self.tree.column("bib_id", width=90)
+        self.tree.column("author", width=160)
+        self.tree.column("bib_id", width=110)
         self.tree.column("available", width=350)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -91,11 +96,11 @@ class LibraryApp_BB:
         ttk.Label(self.master, textvariable=self.status_var, padding=10).pack(fill="x")
 
     def add_book(self):
-        title = self.title_var.get().strip()
+        typed_title = self.title_var.get().strip()
         raw_id = self.bib_var.get().strip()
-        if not title or not raw_id:
+        if not raw_id:
             messagebox.showwarning(
-                "Warning / Figyelem", "Fill in both fields. / Töltsd ki mindkét mezőt!"
+                "Warning / Figyelem", "Enter a bibId or URL. / Adj meg azonosítót vagy URL-t!"
             )
             return
         bib_id = extract_bib_id_BB(raw_id)
@@ -104,7 +109,36 @@ class LibraryApp_BB:
                 "Warning / Figyelem", "Invalid bibId or URL. / Érvénytelen azonosító vagy URL!"
             )
             return
-        if not self.database.add_book_BB(title, bib_id):
+        if self.database.book_exists_BB(bib_id):
+            messagebox.showwarning(
+                "Warning / Figyelem", "This book is already listed. / Ez a könyv már szerepel!"
+            )
+            return
+        self.set_buttons_state("disabled")
+        self.set_status("Loading record... / Rekord betöltése...")
+        worker = threading.Thread(
+            target=self.load_record, args=(bib_id, typed_title), daemon=True
+        )
+        worker.start()
+
+    def load_record(self, bib_id, typed_title):
+        try:
+            fetched_title, author = fetch_record_info_BB(bib_id)
+        except requests.exceptions.RequestException:
+            fetched_title, author = "", ""
+        self.master.after(0, self.finish_add, bib_id, typed_title, fetched_title, author)
+
+    def finish_add(self, bib_id, typed_title, fetched_title, author):
+        self.set_buttons_state("normal")
+        self.status_var.set("Done / Kész")
+        title = typed_title or fetched_title
+        if not title:
+            messagebox.showwarning(
+                "Warning / Figyelem",
+                "Could not load the title, enter it manually. / A címet nem sikerült lekérni, add meg kézzel!",
+            )
+            return
+        if not self.database.add_book_BB(title, bib_id, author):
             messagebox.showwarning(
                 "Warning / Figyelem", "This book is already listed. / Ez a könyv már szerepel!"
             )
@@ -115,8 +149,10 @@ class LibraryApp_BB:
 
     def refresh_list(self):
         self.tree.delete(*self.tree.get_children())
-        for book_id, title, bib_id in self.database.get_books_BB():
-            self.tree.insert("", "end", iid=str(book_id), values=(title, bib_id, ""))
+        for book_id, title, bib_id, author in self.database.get_books_BB():
+            self.tree.insert(
+                "", "end", iid=str(book_id), values=(title, author, bib_id, "")
+            )
 
     def get_selected_item(self):
         selection = self.tree.selection()
