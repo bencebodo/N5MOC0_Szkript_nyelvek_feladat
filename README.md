@@ -34,10 +34,10 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
 ### Saját függvények
 
 - `extract_bib_id_BB(text)`: a `bibFSZ` azonosítót keresi, ennek hiányában a végén álló számjegyeket veszi ki
-- `fetch_record_info_BB(bib_id)`: lekéri a rekord címét és szerzőjét
-- `parse_record_info_BB(html)`: a rekord HTML-jéből kiolvassa a címet és a szerzőt
-- `fetch_availability_BB(bib_id)`: a FSZEK katalógusától lekéri az elérhetőséget (három kérésben)
-- `parse_branches_BB(html)`: a válaszban lévő példánylistából könyvtáranként megszámolja az elérhető példányokat
+- `parse_items_BB(html)`: a válaszban lévő példánylistát (JSON) olvassa ki
+- `library_counts_BB(items)`: könyvtáranként megadja az elérhető példányok számát
+- `parse_title_author_BB(items)`: a példányadatokból kiolvassa a címet és a szerzőt
+- `fetch_availability_BB(bib_id)`: a FSZEK katalógusától lekéri az elérhetőséget, a címet és a szerzőt (három kérésben)
 - `count_available_BB(items)`: az elérhető példányokat könyvtáranként összesíti
 - `normalize_location_BB(location)`: a példány helyét a listában szereplő könyvtár nevére alakítja
 - `add_session_cookies_BB(session)`: a katalógus által elvárt munkamenet-sütiket állítja be

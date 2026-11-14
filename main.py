@@ -10,7 +10,6 @@ from LibraryTracker_BB import (
     LibraryDatabase_BB,
     extract_bib_id_BB,
     fetch_availability_BB,
-    fetch_record_info_BB,
 )
 
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.db")
@@ -30,6 +29,7 @@ class LibraryApp_BB:
         self.bib_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Ready / Kész")
         self.action_buttons = []
+        self.results = {}
         self.create_widgets()
         self.refresh_list()
 
@@ -57,7 +57,7 @@ class LibraryApp_BB:
             table_frame,
             columns=("title", "author", "bib_id", "available"),
             show="headings",
-            height=12,
+            height=10,
         )
         self.tree.heading("title", text="Title")
         self.tree.heading("author", text="Author")
@@ -72,6 +72,7 @@ class LibraryApp_BB:
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         self.tree.bind("<Double-1>", self.show_branches)
+        self.tree.bind("<<TreeviewSelect>>", self.on_select)
 
         button_frame = ttk.Frame(self.master, padding=10)
         button_frame.pack(fill="x")
@@ -92,6 +93,23 @@ class LibraryApp_BB:
             check_all_button,
             delete_button,
         ]
+
+        output_frame = ttk.LabelFrame(
+            self.master, text="Output / Kimenet: availability of the selected book",
+            padding=10,
+        )
+        output_frame.pack(fill="x", padx=10)
+        self.output_tree = ttk.Treeview(
+            output_frame,
+            columns=("location", "available"),
+            show="headings",
+            height=7,
+        )
+        self.output_tree.heading("location", text="Location / Könyvtár")
+        self.output_tree.heading("available", text="Available / Elérhető")
+        self.output_tree.column("location", width=400)
+        self.output_tree.column("available", width=150, anchor="center")
+        self.output_tree.pack(fill="x")
 
         ttk.Label(self.master, textvariable=self.status_var, padding=10).pack(fill="x")
 
@@ -122,10 +140,11 @@ class LibraryApp_BB:
         worker.start()
 
     def load_record(self, bib_id, typed_title):
+        fetched_title, author = "", ""
         try:
-            fetched_title, author = fetch_record_info_BB(bib_id)
-        except requests.exceptions.RequestException:
-            fetched_title, author = "", ""
+            _counts, fetched_title, author = fetch_availability_BB(bib_id)
+        except (requests.exceptions.RequestException, ValueError):
+            pass
         self.master.after(0, self.finish_add, bib_id, typed_title, fetched_title, author)
 
     def finish_add(self, bib_id, typed_title, fetched_title, author):
@@ -153,6 +172,7 @@ class LibraryApp_BB:
             self.tree.insert(
                 "", "end", iid=str(book_id), values=(title, author, bib_id, "")
             )
+        self.show_output(None)
 
     def get_selected_item(self):
         selection = self.tree.selection()
@@ -190,28 +210,33 @@ class LibraryApp_BB:
             self.master.after(
                 0, self.set_status, f"Checking {index}/{total}... / Ellenőrzés {index}/{total}..."
             )
-            result_text = self.check_book_availability(bib_id)
-            self.master.after(0, self.set_row_text, item_id, result_text)
+            result_text, counts = self.check_book_availability(bib_id)
+            self.master.after(0, self.set_row_result, item_id, result_text, counts)
             time.sleep(CHECK_DELAY_SECONDS)
         self.master.after(0, self.finish_checks)
 
     def check_book_availability(self, bib_id):
         try:
-            branches = fetch_availability_BB(bib_id)
+            counts, _title, _author = fetch_availability_BB(bib_id)
         except requests.exceptions.RequestException:
-            return NETWORK_ERROR_TEXT
+            return NETWORK_ERROR_TEXT, []
         except ValueError:
-            return PARSE_ERROR_TEXT
-        if not branches:
-            return NO_COPIES_TEXT
-        return ", ".join(branches)
+            return PARSE_ERROR_TEXT, []
+        if not counts:
+            return NO_COPIES_TEXT, []
+        text = ", ".join(f"{location}: {count} db" for location, count in counts)
+        return text, counts
 
     def set_status(self, text):
         self.status_var.set(text)
 
-    def set_row_text(self, item_id, text):
-        if self.tree.exists(item_id):
-            self.tree.set(item_id, "available", text)
+    def set_row_result(self, item_id, text, counts):
+        if not self.tree.exists(item_id):
+            return
+        self.tree.set(item_id, "available", text)
+        self.results[item_id] = counts
+        if self.get_current_item() == item_id:
+            self.show_output(item_id)
 
     def finish_checks(self):
         self.set_buttons_state("normal")
@@ -220,6 +245,24 @@ class LibraryApp_BB:
     def set_buttons_state(self, state):
         for button in self.action_buttons:
             button.config(state=state)
+
+    def get_current_item(self):
+        selection = self.tree.selection()
+        return selection[0] if selection else None
+
+    def on_select(self, event):
+        self.show_output(self.get_current_item())
+
+    def show_output(self, item_id):
+        self.output_tree.delete(*self.output_tree.get_children())
+        if item_id is None or item_id not in self.results:
+            return
+        counts = self.results[item_id]
+        if not counts:
+            self.output_tree.insert("", "end", values=(NO_COPIES_TEXT, 0))
+            return
+        for location, count in counts:
+            self.output_tree.insert("", "end", values=(location, count))
 
     def show_branches(self, event):
         item_id = self.tree.identify_row(event.y)
@@ -234,6 +277,7 @@ class LibraryApp_BB:
         if item_id is None:
             return
         self.database.delete_book_BB(int(item_id))
+        self.results.pop(item_id, None)
         self.refresh_list()
 
     def on_close(self):

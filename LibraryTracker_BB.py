@@ -2,7 +2,6 @@ import json
 import re
 import sqlite3
 import time
-from html import unescape
 
 import requests
 
@@ -35,12 +34,6 @@ SESSION_LIFETIME_MS = 1800000
 BIB_FSZ_PATTERN = re.compile(r"bibFSZ\d+")
 TRAILING_DIGITS_PATTERN = re.compile(r"(\d+)\s*/?\s*$")
 ITEMS_PATTERN = re.compile(r'circTable\.data\("itemsJson",\s*(\[.*?\])\);', re.DOTALL)
-TITLE_META_PATTERN = re.compile(
-    r'<meta\s+name="citation_title"\s+content="([^"]*)"', re.IGNORECASE
-)
-AUTHOR_META_PATTERN = re.compile(
-    r'<meta\s+name="citation_author"\s+content="([^"]*)"', re.IGNORECASE
-)
 LIBRARY_ORDER = (
     "1117 Karinthy út 11.",
     "KK",
@@ -116,6 +109,13 @@ def normalize_location_BB(location):
     return None
 
 
+def parse_items_BB(html):
+    match = ITEMS_PATTERN.search(html)
+    if match is None:
+        return []
+    return json.loads(match.group(1))
+
+
 def count_available_BB(items):
     counts = {}
     for item in items:
@@ -126,34 +126,18 @@ def count_available_BB(items):
     return counts
 
 
-def parse_branches_BB(html):
-    match = ITEMS_PATTERN.search(html)
-    if match is None:
-        return []
-    items = json.loads(match.group(1))
+def library_counts_BB(items):
     counts = count_available_BB(items)
-    return [
-        f"{library}: {counts[library]} db"
-        for library in LIBRARY_ORDER
-        if library in counts
-    ]
+    return [(library, counts[library]) for library in LIBRARY_ORDER if library in counts]
 
 
-def parse_record_info_BB(html):
-    title_match = TITLE_META_PATTERN.search(html)
-    title = unescape(title_match.group(1)).strip() if title_match else ""
-    authors = [unescape(author).strip() for author in AUTHOR_META_PATTERN.findall(html)]
-    return title, ", ".join(author for author in authors if author)
-
-
-def fetch_record_info_BB(bib_id):
-    with requests.Session() as session:
-        session.headers.update({"User-Agent": USER_AGENT})
-        response = session.get(
-            MANIFESTATION_URL.format(bib_id=bib_id), timeout=TIMEOUT_SECONDS
-        )
-        response.raise_for_status()
-        return parse_record_info_BB(response.text)
+def parse_title_author_BB(items):
+    if not items:
+        return "", ""
+    first = items[0]
+    title = str(first.get("title") or "").strip()
+    author = str(first.get("author") or first.get("authors") or "").strip()
+    return title, author
 
 
 def add_session_cookies_BB(session):
@@ -202,4 +186,7 @@ def fetch_availability_BB(bib_id):
             timeout=TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        return parse_branches_BB(response.text)
+        items = parse_items_BB(response.text)
+
+    title, author = parse_title_author_BB(items)
+    return library_counts_BB(items), title, author
