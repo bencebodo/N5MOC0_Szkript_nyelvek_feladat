@@ -14,6 +14,8 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
 - `json` (tanult): a katalógusválaszban lévő példánylista beolvasása
 - `threading` (tanult): háttérszál a hálózati lekérdezésekhez
 - `time` (tanult): rövid várakozás a lekérdezések között
+- `os` (tanult): az adatbázisfájl útvonalának meghatározása
+- `webbrowser` (tanult): a rekord közvetlen linkjének megnyitása böngészőben
 - `requests` (bemutatott): HTTP-kérések a FSZEK katalógusához
 - `LibraryTracker_BB` (saját modul): az alkalmazás logikája, GUI-kód nélkül
 
@@ -33,7 +35,7 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
 
 ### Saját függvények
 
-- `extract_bib_id_BB(text)`: a `bibFSZ` azonosítót keresi, ennek hiányában a végén álló számjegyeket veszi ki
+- `extract_bib_id_BB(text)`: a `bibFSZ…` katalógusazonosítót keresi a szövegben vagy az URL-ben, ha nincs ilyen, `None`-t ad vissza
 - `parse_items_BB(html)`: a válaszban lévő példánylistát (JSON) olvassa ki
 - `library_counts_BB(items)`: könyvtáranként megadja az elérhető példányok számát
 - `parse_title_author_BB(items)`: a példányadatokból kiolvassa a címet és a szerzőt
@@ -49,7 +51,7 @@ Az alkalmazás asztali program, amellyel a FSZEK könyvtári katalógusban kivá
 - `session.post(...)`: POST-kérések (JSON és űrlap-adat) a munkameneten belül
 - `session.cookies.set(...)`: sütik beállítása
 - `response.raise_for_status()`: HTTP-hibák jelzése
-- `requests.exceptions.RequestException`: hálózati hibák kezelése
+- `requests.exceptions.RequestException`: hálózati hibák kezelése (a `main.py`-ban is importálva)
 
 ## Futtatás
 

@@ -2,6 +2,7 @@ import os
 import threading
 import time
 import tkinter as tk
+import webbrowser
 from tkinter import ttk, messagebox
 
 import requests
@@ -13,6 +14,7 @@ from LibraryTracker_BB import (
 )
 
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.db")
+RECORD_LINK_TEMPLATE = "https://fszekonline.fszek.hu/record/-/record/{bib_id}"
 NO_COPIES_TEXT = "No available copies found / nincs elérhető példány"
 NETWORK_ERROR_TEXT = "Network error / hálózati hiba"
 PARSE_ERROR_TEXT = "Parse error / feldolgozási hiba"
@@ -25,7 +27,6 @@ class LibraryApp_BB:
         self.master.title("FSZEK Library Tracker")
         self.master.protocol("WM_DELETE_WINDOW", self.on_close)
         self.database = LibraryDatabase_BB(DB_FILE)
-        self.title_var = tk.StringVar()
         self.bib_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Ready / Kész")
         self.action_buttons = []
@@ -36,42 +37,36 @@ class LibraryApp_BB:
     def create_widgets(self):
         input_frame = ttk.Frame(self.master, padding=10)
         input_frame.pack(fill="x")
-        ttk.Label(input_frame, text="Title (optional) / Cím (opcionális):").grid(
+        ttk.Label(input_frame, text="bibId or URL / azonosító vagy URL:").grid(
             row=0, column=0, sticky="w"
         )
-        ttk.Entry(input_frame, textvariable=self.title_var, width=40).grid(
+        ttk.Entry(input_frame, textvariable=self.bib_var, width=50).grid(
             row=0, column=1, padx=5, pady=2
         )
-        ttk.Label(input_frame, text="bibId or URL / azonosító vagy URL:").grid(
-            row=1, column=0, sticky="w"
-        )
-        ttk.Entry(input_frame, textvariable=self.bib_var, width=40).grid(
-            row=1, column=1, padx=5, pady=2
-        )
         add_button = ttk.Button(input_frame, text="Add Book", command=self.add_book)
-        add_button.grid(row=0, column=2, rowspan=2, padx=5)
+        add_button.grid(row=0, column=2, padx=5)
 
         table_frame = ttk.Frame(self.master, padding=(10, 0))
         table_frame.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(
             table_frame,
-            columns=("title", "author", "bib_id", "available"),
+            columns=("title", "author", "bib_id", "link"),
             show="headings",
             height=10,
         )
         self.tree.heading("title", text="Title")
         self.tree.heading("author", text="Author")
         self.tree.heading("bib_id", text="bibId")
-        self.tree.heading("available", text="Available at")
+        self.tree.heading("link", text="Direct link")
         self.tree.column("title", width=250)
         self.tree.column("author", width=160)
         self.tree.column("bib_id", width=110)
-        self.tree.column("available", width=350)
+        self.tree.column("link", width=350)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        self.tree.bind("<Double-1>", self.show_branches)
+        self.tree.bind("<Double-1>", self.open_link)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
 
         button_frame = ttk.Frame(self.master, padding=10)
@@ -95,7 +90,8 @@ class LibraryApp_BB:
         ]
 
         output_frame = ttk.LabelFrame(
-            self.master, text="Output / Kimenet: availability of the selected book",
+            self.master,
+            text="Output / Kimenet: availability of the selected book",
             padding=10,
         )
         output_frame.pack(fill="x", padx=10)
@@ -114,7 +110,6 @@ class LibraryApp_BB:
         ttk.Label(self.master, textvariable=self.status_var, padding=10).pack(fill="x")
 
     def add_book(self):
-        typed_title = self.title_var.get().strip()
         raw_id = self.bib_var.get().strip()
         if not raw_id:
             messagebox.showwarning(
@@ -134,27 +129,27 @@ class LibraryApp_BB:
             return
         self.set_buttons_state("disabled")
         self.set_status("Loading record... / Rekord betöltése...")
-        worker = threading.Thread(
-            target=self.load_record, args=(bib_id, typed_title), daemon=True
-        )
+        worker = threading.Thread(target=self.load_record, args=(bib_id,), daemon=True)
         worker.start()
 
-    def load_record(self, bib_id, typed_title):
-        fetched_title, author = "", ""
+    def load_record(self, bib_id):
+        title, author, error = "", "", ""
         try:
-            _counts, fetched_title, author = fetch_availability_BB(bib_id)
-        except (requests.exceptions.RequestException, ValueError):
-            pass
-        self.master.after(0, self.finish_add, bib_id, typed_title, fetched_title, author)
+            _counts, title, author = fetch_availability_BB(bib_id)
+        except requests.exceptions.RequestException as exc:
+            error = f"{NETWORK_ERROR_TEXT}: {exc}"
+        except ValueError as exc:
+            error = f"{PARSE_ERROR_TEXT}: {exc}"
+        self.master.after(0, self.finish_add, bib_id, title, author, error)
 
-    def finish_add(self, bib_id, typed_title, fetched_title, author):
+    def finish_add(self, bib_id, title, author, error):
         self.set_buttons_state("normal")
         self.status_var.set("Done / Kész")
-        title = typed_title or fetched_title
         if not title:
+            reason = error or "No title in the response / Nincs cím a válaszban"
             messagebox.showwarning(
                 "Warning / Figyelem",
-                "Could not load the title, enter it manually. / A címet nem sikerült lekérni, add meg kézzel!",
+                "Could not load the book title. / A könyv címét nem sikerült lekérni.\n\n" + reason,
             )
             return
         if not self.database.add_book_BB(title, bib_id, author):
@@ -162,7 +157,6 @@ class LibraryApp_BB:
                 "Warning / Figyelem", "This book is already listed. / Ez a könyv már szerepel!"
             )
             return
-        self.title_var.set("")
         self.bib_var.set("")
         self.refresh_list()
 
@@ -170,7 +164,10 @@ class LibraryApp_BB:
         self.tree.delete(*self.tree.get_children())
         for book_id, title, bib_id, author in self.database.get_books_BB():
             self.tree.insert(
-                "", "end", iid=str(book_id), values=(title, author, bib_id, "")
+                "",
+                "end",
+                iid=str(book_id),
+                values=(title, author, bib_id, RECORD_LINK_TEMPLATE.format(bib_id=bib_id)),
             )
         self.show_output(None)
 
@@ -210,32 +207,29 @@ class LibraryApp_BB:
             self.master.after(
                 0, self.set_status, f"Checking {index}/{total}... / Ellenőrzés {index}/{total}..."
             )
-            result_text, counts = self.check_book_availability(bib_id)
-            self.master.after(0, self.set_row_result, item_id, result_text, counts)
+            counts, error = self.check_book_availability(bib_id)
+            self.master.after(0, self.set_row_result, item_id, counts, error)
             time.sleep(CHECK_DELAY_SECONDS)
         self.master.after(0, self.finish_checks)
 
     def check_book_availability(self, bib_id):
         try:
             counts, _title, _author = fetch_availability_BB(bib_id)
-        except requests.exceptions.RequestException:
-            return NETWORK_ERROR_TEXT, []
-        except ValueError:
-            return PARSE_ERROR_TEXT, []
-        available_parts = [(location, count) for location, count in counts if count > 0]
-        if not available_parts:
-            return NO_COPIES_TEXT, counts
-        text = ", ".join(f"{location}: {count} db" for location, count in available_parts)
-        return text, counts
+        except requests.exceptions.RequestException as exc:
+            return [], f"{NETWORK_ERROR_TEXT}: {exc}"
+        except ValueError as exc:
+            return [], f"{PARSE_ERROR_TEXT}: {exc}"
+        return counts, ""
 
     def set_status(self, text):
         self.status_var.set(text)
 
-    def set_row_result(self, item_id, text, counts):
+    def set_row_result(self, item_id, counts, error):
         if not self.tree.exists(item_id):
             return
-        self.tree.set(item_id, "available", text)
-        self.results[item_id] = counts
+        self.results[item_id] = (counts, error)
+        if error:
+            self.set_status(error)
         if self.get_current_item() == item_id:
             self.show_output(item_id)
 
@@ -258,20 +252,21 @@ class LibraryApp_BB:
         self.output_tree.delete(*self.output_tree.get_children())
         if item_id is None or item_id not in self.results:
             return
-        counts = self.results[item_id]
+        counts, error = self.results[item_id]
+        if error:
+            self.output_tree.insert("", "end", values=(error, ""))
+            return
         if not counts:
             self.output_tree.insert("", "end", values=(NO_COPIES_TEXT, 0))
             return
         for location, count in counts:
             self.output_tree.insert("", "end", values=(location, count))
 
-    def show_branches(self, event):
+    def open_link(self, event):
         item_id = self.tree.identify_row(event.y)
         if not item_id:
             return
-        title = self.tree.set(item_id, "title")
-        available = self.tree.set(item_id, "available")
-        messagebox.showinfo(title, available or "Not checked yet / Még nincs ellenőrizve")
+        webbrowser.open(self.tree.set(item_id, "link"))
 
     def delete_selected(self):
         item_id = self.get_selected_item()

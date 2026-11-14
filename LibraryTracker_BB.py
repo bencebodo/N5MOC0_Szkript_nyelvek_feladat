@@ -32,7 +32,6 @@ USER_AGENT = (
 TIMEOUT_SECONDS = 15
 SESSION_LIFETIME_MS = 1800000
 BIB_FSZ_PATTERN = re.compile(r"bibFSZ\d+")
-TRAILING_DIGITS_PATTERN = re.compile(r"(\d+)\s*/?\s*$")
 ITEMS_PATTERN = re.compile(r'circTable\.data\("itemsJson",\s*(\[.*?\])\);', re.DOTALL)
 
 
@@ -83,12 +82,9 @@ class LibraryDatabase_BB:
 def extract_bib_id_BB(text):
     stripped = text.strip()
     match = BIB_FSZ_PATTERN.search(stripped)
-    if match is not None:
-        return match.group(0)
-    match = TRAILING_DIGITS_PATTERN.search(stripped)
     if match is None:
         return None
-    return match.group(1)
+    return match.group(0)
 
 
 def parse_items_BB(html):
