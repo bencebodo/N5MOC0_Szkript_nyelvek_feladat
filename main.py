@@ -2,6 +2,7 @@ import os
 import threading
 import time
 import tkinter as tk
+import tkinter.font as tkfont
 import webbrowser
 from tkinter import ttk, messagebox
 
@@ -14,10 +15,21 @@ from LibraryTracker_BB import (
 )
 
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.db")
+CATALOGUE_URL = "https://fszekonline.fszek.hu/"
 RECORD_LINK_TEMPLATE = "https://fszekonline.fszek.hu/record/-/record/{bib_id}"
-NO_COPIES_TEXT = "No available copies found / nincs elérhető példány"
-NETWORK_ERROR_TEXT = "Network error / hálózati hiba"
-PARSE_ERROR_TEXT = "Parse error / feldolgozási hiba"
+EXAMPLE_URL = "https://fszekonline.fszek.hu/record/-/record/bibFSZ123456"
+GUIDE_STEPS = (
+    "1. Open the catalogue:",
+    "2. Search for your book.",
+    "3. Open the book's page and copy the URL from the address bar. "
+    "It must contain a bibFSZ id, for example:\n" + EXAMPLE_URL,
+    "4. Paste the URL into the field above and click Add Book.",
+    "5. Select a book and click Check Selected or Check All. "
+    "Its availability per library appears in the Output table.",
+)
+NO_COPIES_TEXT = "No available copies found"
+NETWORK_ERROR_TEXT = "Network error"
+PARSE_ERROR_TEXT = "Parse error"
 CHECK_DELAY_SECONDS = 0.5
 
 
@@ -28,25 +40,26 @@ class LibraryApp_BB:
         self.master.protocol("WM_DELETE_WINDOW", self.on_close)
         self.database = LibraryDatabase_BB(DB_FILE)
         self.bib_var = tk.StringVar()
-        self.status_var = tk.StringVar(value="Ready / Kész")
+        self.status_var = tk.StringVar(value="Ready")
         self.action_buttons = []
         self.results = {}
         self.create_widgets()
         self.refresh_list()
 
     def create_widgets(self):
-        input_frame = ttk.Frame(self.master, padding=10)
+        container = ttk.Frame(self.master)
+        container.pack(side="left", fill="both", expand=True)
+
+        input_frame = ttk.Frame(container, padding=10)
         input_frame.pack(fill="x")
-        ttk.Label(input_frame, text="bibId or URL / azonosító vagy URL:").grid(
-            row=0, column=0, sticky="w"
-        )
+        ttk.Label(input_frame, text="Könyv URL-je:").grid(row=0, column=0, sticky="w")
         ttk.Entry(input_frame, textvariable=self.bib_var, width=50).grid(
             row=0, column=1, padx=5, pady=2
         )
         add_button = ttk.Button(input_frame, text="Add Book", command=self.add_book)
         add_button.grid(row=0, column=2, padx=5)
 
-        table_frame = ttk.Frame(self.master, padding=(10, 0))
+        table_frame = ttk.Frame(container, padding=(10, 0))
         table_frame.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(
             table_frame,
@@ -54,14 +67,14 @@ class LibraryApp_BB:
             show="headings",
             height=10,
         )
-        self.tree.heading("title", text="Title")
-        self.tree.heading("author", text="Author")
+        self.tree.heading("title", text="Cím")
+        self.tree.heading("author", text="Szerző")
         self.tree.heading("bib_id", text="bibId")
-        self.tree.heading("link", text="Direct link")
+        self.tree.heading("link", text="Közvetlen link")
         self.tree.column("title", width=250)
         self.tree.column("author", width=160)
         self.tree.column("bib_id", width=110)
-        self.tree.column("link", width=350)
+        self.tree.column("link", width=300)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -70,7 +83,7 @@ class LibraryApp_BB:
         self.tree.bind("<Motion>", self.on_tree_motion)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
 
-        button_frame = ttk.Frame(self.master, padding=10)
+        button_frame = ttk.Frame(container, padding=10)
         button_frame.pack(fill="x")
         check_selected_button = ttk.Button(
             button_frame, text="Check Selected", command=self.check_selected
@@ -91,9 +104,7 @@ class LibraryApp_BB:
         ]
 
         output_frame = ttk.LabelFrame(
-            self.master,
-            text="Output / Kimenet: availability of the selected book",
-            padding=10,
+            container, text="Elérhetőség (a kiválasztott könyv)", padding=10
         )
         output_frame.pack(fill="x", padx=10)
         self.output_tree = ttk.Treeview(
@@ -102,34 +113,52 @@ class LibraryApp_BB:
             show="headings",
             height=7,
         )
-        self.output_tree.heading("location", text="Location / Könyvtár")
-        self.output_tree.heading("available", text="Available / Elérhető")
+        self.output_tree.heading("location", text="Könyvtár")
+        self.output_tree.heading("available", text="Elérhető")
         self.output_tree.column("location", width=400)
         self.output_tree.column("available", width=150, anchor="center")
         self.output_tree.pack(fill="x")
 
-        ttk.Label(self.master, textvariable=self.status_var, padding=10).pack(fill="x")
+        ttk.Label(container, textvariable=self.status_var, padding=10).pack(fill="x")
+
+        self.create_guide()
+
+    def create_guide(self):
+        guide = ttk.LabelFrame(self.master, text="Útmutató", padding=10)
+        guide.pack(side="right", fill="y", padx=10, pady=10)
+        for step in GUIDE_STEPS[:1]:
+            ttk.Label(guide, text=step, wraplength=280, justify="left").pack(
+                anchor="w", pady=(0, 2)
+            )
+        link_font = tkfont.Font(self.master, font="TkDefaultFont")
+        link_font.configure(underline=True)
+        link = ttk.Label(
+            guide, text=CATALOGUE_URL, foreground="blue", cursor="hand2", font=link_font
+        )
+        link.pack(anchor="w", pady=(0, 8))
+        link.bind("<Button-1>", lambda event: webbrowser.open(CATALOGUE_URL))
+        for step in GUIDE_STEPS[1:]:
+            ttk.Label(guide, text=step, wraplength=280, justify="left").pack(
+                anchor="w", pady=(0, 8)
+            )
 
     def add_book(self):
         raw_id = self.bib_var.get().strip()
         if not raw_id:
-            messagebox.showwarning(
-                "Warning / Figyelem", "Enter a bibId or URL. / Adj meg azonosítót vagy URL-t!"
-            )
+            messagebox.showwarning("Warning", "Paste the book URL first.")
             return
         bib_id = extract_bib_id_BB(raw_id)
         if bib_id is None:
             messagebox.showwarning(
-                "Warning / Figyelem", "Invalid bibId or URL. / Érvénytelen azonosító vagy URL!"
+                "Warning",
+                "The URL must contain a bibFSZ id, for example:\n" + EXAMPLE_URL,
             )
             return
         if self.database.book_exists_BB(bib_id):
-            messagebox.showwarning(
-                "Warning / Figyelem", "This book is already listed. / Ez a könyv már szerepel!"
-            )
+            messagebox.showwarning("Warning", "This book is already listed.")
             return
         self.set_buttons_state("disabled")
-        self.set_status("Loading record... / Rekord betöltése...")
+        self.set_status("Loading record...")
         worker = threading.Thread(target=self.load_record, args=(bib_id,), daemon=True)
         worker.start()
 
@@ -145,18 +174,16 @@ class LibraryApp_BB:
 
     def finish_add(self, bib_id, title, author, error):
         self.set_buttons_state("normal")
-        self.status_var.set("Done / Kész")
+        self.status_var.set("Done")
         if not title:
-            reason = error or "No title in the response / Nincs cím a válaszban"
+            reason = error or "No title in the response"
             messagebox.showwarning(
-                "Warning / Figyelem",
-                "Could not load the book title. / A könyv címét nem sikerült lekérni.\n\n" + reason,
+                "Warning",
+                "Could not load the book title.\n\n" + reason,
             )
             return
         if not self.database.add_book_BB(title, bib_id, author):
-            messagebox.showwarning(
-                "Warning / Figyelem", "This book is already listed. / Ez a könyv már szerepel!"
-            )
+            messagebox.showwarning("Warning", "This book is already listed.")
             return
         self.bib_var.set("")
         self.refresh_list()
@@ -175,9 +202,7 @@ class LibraryApp_BB:
     def get_selected_item(self):
         selection = self.tree.selection()
         if not selection:
-            messagebox.showwarning(
-                "Warning / Figyelem", "Select a book first. / Válassz ki egy könyvet!"
-            )
+            messagebox.showwarning("Warning", "Select a book first.")
             return None
         return selection[0]
 
@@ -193,7 +218,7 @@ class LibraryApp_BB:
             for item_id in self.tree.get_children()
         ]
         if not items:
-            messagebox.showinfo("Info", "The list is empty. / A lista üres.")
+            messagebox.showinfo("Info", "The list is empty.")
             return
         self.start_checks(items)
 
@@ -205,9 +230,7 @@ class LibraryApp_BB:
     def run_checks(self, items):
         total = len(items)
         for index, (item_id, bib_id) in enumerate(items, start=1):
-            self.master.after(
-                0, self.set_status, f"Checking {index}/{total}... / Ellenőrzés {index}/{total}..."
-            )
+            self.master.after(0, self.set_status, f"Checking {index}/{total}...")
             counts, error = self.check_book_availability(bib_id)
             self.master.after(0, self.set_row_result, item_id, counts, error)
             time.sleep(CHECK_DELAY_SECONDS)
@@ -236,7 +259,7 @@ class LibraryApp_BB:
 
     def finish_checks(self):
         self.set_buttons_state("normal")
-        self.status_var.set("Done / Kész")
+        self.status_var.set("Done")
 
     def set_buttons_state(self, state):
         for button in self.action_buttons:
