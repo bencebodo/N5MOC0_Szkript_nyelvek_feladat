@@ -19,13 +19,14 @@ CATALOGUE_URL = "https://fszekonline.fszek.hu/"
 RECORD_LINK_TEMPLATE = "https://fszekonline.fszek.hu/record/-/record/{bib_id}"
 EXAMPLE_URL = "https://fszekonline.fszek.hu/record/-/record/bibFSZ123456"
 GUIDE_STEPS = (
-    "1. Open the catalogue:",
-    "2. Search for your book.",
-    "3. Open the book's page and copy the URL from the address bar. "
-    "It must contain a bibFSZ id, for example:\n" + EXAMPLE_URL,
-    "4. Paste the URL into the field above and click Add Book.",
-    "5. Select a book and click Check Selected or Check All. "
-    "Its availability per library appears in the Output table.",
+    "1. Nyisd meg a katalógust:",
+    "2. Keress rá a könyvre.",
+    "3. Nyisd meg a könyv oldalát, és másold ki az URL-t a címsorból. "
+    "Tartalmaznia kell egy bibFSZ azonosítót, például:\n" + EXAMPLE_URL,
+    "4. Illeszd be az URL-t a fenti mezőbe, és kattints az „Add Book” gombra.",
+    "5. Válassz ki egy könyvet, és kattints a „Check Selected” vagy a „Check All” "
+    "gombra. A könyvtáranként elérhető példányok a kimeneti táblázatban jelennek meg.",
+    "6. A „Közvetlen link” oszlopban a linkre kattintva megnyílik a könyv oldala.",
 )
 NO_COPIES_TEXT = "No available copies found"
 NETWORK_ERROR_TEXT = "Network error"
